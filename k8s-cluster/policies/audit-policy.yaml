@@ -1,0 +1,35 @@
+apiVersion: audit.k8s.io/v1
+kind: Policy
+rules:
+  # Log all authentication & authorization failures (important for SOC 2)
+  - level: Metadata
+    verbs: ["create", "update", "delete", "patch"]
+    userGroups: ["system:unauthenticated"]
+    resources: ["*"]
+  
+  # Log all failed requests (unauthorized access attempts)
+  - level: Metadata
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+    resources: ["*"]
+    omitStages:
+      - "ResponseComplete"
+    userGroups: ["system:unauthenticated", "system:serviceaccounts"]
+
+  # Log all RBAC role modifications (high security impact)
+  - level: RequestResponse
+    verbs: ["create", "update", "delete"]
+    resources:
+      - group: "rbac.authorization.k8s.io"
+        resources: ["roles", "rolebindings", "clusterroles", "clusterrolebindings"]
+
+  # Log all access to Secrets & ConfigMaps (sensitive data tracking)
+  - level: RequestResponse
+    verbs: ["get", "create", "update", "delete"]
+    resources:
+      - group: ""
+        resources: ["secrets", "configmaps"]
+
+  # Log all API server requests at Metadata level (general compliance logging)
+  - level: Metadata
+    verbs: ["*"]
+    resources: ["*"]
