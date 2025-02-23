@@ -1,35 +1,52 @@
 apiVersion: audit.k8s.io/v1
 kind: Policy
 rules:
-  # Log all authentication & authorization failures (important for SOC 2)
-  - level: Metadata
-    verbs: ["create", "update", "delete", "patch"]
-    userGroups: ["system:unauthenticated"]
-    resources: ["*"]
-  
-  # Log all failed requests (unauthorized access attempts)
-  - level: Metadata
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-    resources: ["*"]
-    omitStages:
-      - "ResponseComplete"
-    userGroups: ["system:unauthenticated", "system:serviceaccounts"]
-
-  # Log all RBAC role modifications (high security impact)
+  # Log all authentication & authorization failures
   - level: RequestResponse
-    verbs: ["create", "update", "delete"]
+    verbs: ["create", "update", "patch", "delete"]
+    users: ["system:anonymous"]
+    resources:
+      - group: "authentication.k8s.io"
+      - group: "authorization.k8s.io"
+
+  # Log pod & deployment changes (SOC 2 Critical)
+  - level: RequestResponse
+    resources:
+      - group: ""
+        resources: ["pods", "deployments", "replicasets", "statefulsets", "daemonsets"]
+
+  # Log changes to cluster roles and role bindings
+  - level: RequestResponse
     resources:
       - group: "rbac.authorization.k8s.io"
         resources: ["roles", "rolebindings", "clusterroles", "clusterrolebindings"]
 
-  # Log all access to Secrets & ConfigMaps (sensitive data tracking)
+  # Log changes to secrets, service accounts, and configmaps (SOC 2 Critical)
   - level: RequestResponse
-    verbs: ["get", "create", "update", "delete"]
     resources:
       - group: ""
-        resources: ["secrets", "configmaps"]
+        resources: ["secrets", "configmaps", "serviceaccounts"]
 
-  # Log all API server requests at Metadata level (general compliance logging)
+  # Log persistent volume and node changes
+  - level: RequestResponse
+    resources:
+      - group: ""
+        resources: ["persistentvolumes", "persistentvolumeclaims", "nodes"]
+
+  # Log API server access & system component interactions
   - level: Metadata
-    verbs: ["*"]
-    resources: ["*"]
+    users:
+      - "system:kube-controller-manager"
+      - "system:kube-scheduler"
+      - "system:kube-proxy"
+    nonResourceURLs:
+      - "/metrics"
+      - "/healthz"
+      - "/readyz"
+      - "/livez"
+
+  # Log all other requests at Metadata level
+  - level: Metadata
+    omitStages:
+      - "RequestReceived"
+
